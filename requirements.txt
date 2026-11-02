@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+httpx
+dnspython
+python-multipart
+cryptography
