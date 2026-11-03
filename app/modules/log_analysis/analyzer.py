@@ -143,7 +143,10 @@ def _timestamp(value: Any, line: str) -> tuple[str | None, datetime | None]:
     original = match.group(0)
     normalized = original.replace("Z", "+00:00")
     try:
-        return original, datetime.fromisoformat(normalized)
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return original, dt
     except ValueError:
         return original, None
 

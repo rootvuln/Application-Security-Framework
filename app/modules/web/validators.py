@@ -7,7 +7,8 @@ from urllib.parse import urlparse
 
 def _is_restricted(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return (
-        address.is_private
+        not address.is_global
+        or address.is_private
         or address.is_loopback
         or address.is_link_local
         or address.is_reserved

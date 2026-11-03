@@ -5,3 +5,4 @@ httpx
 dnspython
 python-multipart
 cryptography
+pytest

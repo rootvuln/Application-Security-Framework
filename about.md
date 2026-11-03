@@ -354,6 +354,7 @@ Local cryptographic, encoding, decoding, signing, and identification tools.
 | `POST /api/cryptography/base64/encode` | Base64 encoding |
 | `POST /api/cryptography/base64/decode` | Base64 decoding |
 | `POST /api/cryptography/cipher-identify` | Encoding/cipher identification |
+| `POST /api/cryptography/hash-identify` | Hash algorithm identification |
 | `POST /api/cryptography/rot/decode` | ROT decoding |
 | `POST /api/cryptography/morse/decode` | Morse decoding |
 | `POST /api/cryptography/brainfuck/decode` | Brainfuck decoding |

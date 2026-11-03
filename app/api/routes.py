@@ -22,7 +22,7 @@ from app.schemas.analysis import (
     RsaSignRequest,
     RsaVerifyRequest,
 )
-from app.modules.cryptography.hash_tools import sha256_text
+from app.modules.cryptography.hash_tools import identify_hash, sha256_text
 from app.modules.cryptography.lab import (
     decode_base64,
     decode_brainfuck,
@@ -47,10 +47,14 @@ from app.core.risk import risk_level_for_findings
 router = APIRouter(prefix="/api", tags=["Analysis"])
 SESSION_RESULTS: dict[str, list[dict]] = {}
 MAX_SESSION_RESULTS = 100
+MAX_SESSIONS = 1000
 
 
 def _remember(request: Request, result: AnalysisResponse) -> AnalysisResponse:
     session_id = getattr(request.state, "session_id", "anonymous")
+    if session_id not in SESSION_RESULTS and len(SESSION_RESULTS) >= MAX_SESSIONS:
+        oldest_key = next(iter(SESSION_RESULTS))
+        SESSION_RESULTS.pop(oldest_key, None)
     results = SESSION_RESULTS.setdefault(session_id, [])
     results.append(result.model_dump())
     del results[:-MAX_SESSION_RESULTS]
@@ -149,19 +153,19 @@ def get_report(result_index: int, request: Request):
         raise HTTPException(status_code=404, detail="Session result not found")
     return results[result_index]
 
-@router.post("/analyze/cryptography/hash")
+@router.post("/analyze/cryptography/hash", response_model=AnalysisResponse)
 def hash_text(request: AnalysisRequest):
     result = sha256_text(request.target)
 
-    return {
-        "success": True,
-        "module": "cryptography",
-        "summary": "SHA-256 hash generated",
-        "risk_level": "unknown",
-        "findings": [],
-        "errors": [],
-        "details": result,
-    }
+    return AnalysisResponse(
+        success=True,
+        module="cryptography",
+        summary="SHA-256 hash generated",
+        risk_level="unknown",
+        findings=[],
+        errors=[],
+        details=result,
+    )
 
 
 @router.post("/cryptography/hashes", response_model=AnalysisResponse)
@@ -191,6 +195,23 @@ def base64_decode(request: AnalysisRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AnalysisResponse(success=True, module="cryptography", summary="Base64 decoding completed", details=details)
+
+
+@router.post("/cryptography/hash-identify", response_model=AnalysisResponse)
+def hash_identification(request: AnalysisRequest):
+    details = identify_hash(request.target)
+    count = details.get("match_count", 0)
+    summary = (
+        f"Identified {count} candidate hash algorithm(s)"
+        if count
+        else "No recognized hash algorithm matched the input"
+    )
+    return AnalysisResponse(
+        success=True,
+        module="cryptography",
+        summary=summary,
+        details=details,
+    )
 
 
 @router.post("/cryptography/cipher-identify", response_model=AnalysisResponse)

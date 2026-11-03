@@ -1,11 +1,69 @@
-.venv/
+# Python bytecode & cache
 __pycache__/
 *.py[cod]
+*$py.class
+**/.pytest_cache/
 .pytest_cache/
-qa_reports/
+
+# Virtual Environments (root or subdirectories)
+.venv/
+venv/
+env/
+ENV/
+**/.venv/
+**/venv/
+**/env/
+
+# Environment variables & secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# Testing & Coverage (offline local tests)
+tests/
+pytest.ini
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+qa_reports/
+.tox/
+.nox/
+.hypothesis/
+
+# Linters & Type Checkers
+.mypy_cache/
+.ruff_cache/
+
+# Logs & Runtime
+*.log
+logs/
+*.pid
+
+# IDEs & Editors
 .vscode/
 .idea/
-*.log
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build & Packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Temporary files & uploads
+tmp/
+temp/
+*.tmp

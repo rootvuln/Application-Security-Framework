@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass
-from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)

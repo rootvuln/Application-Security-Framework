@@ -12,6 +12,8 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidSignature, InvalidTag
 
+from .hash_tools import identify_hash
+
 
 MAX_BRAINFUCK_STEPS = 100_000
 MAX_BRAINFUCK_OUTPUT = 4_096
@@ -202,6 +204,17 @@ def decode_brainfuck(value: str) -> str:
 def identify(value: str) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     stripped = value.strip()
+
+    hash_result = identify_hash(stripped)
+    if hash_result["possible_algorithms"]:
+        top_names = [algo["name"] for algo in hash_result["possible_algorithms"][:3]]
+        candidates.append({
+            "type": "hash",
+            "confidence": hash_result["possible_algorithms"][0]["confidence"],
+            "decoded": f"Likely: {', '.join(top_names)}",
+            "algorithms": hash_result["possible_algorithms"],
+        })
+
     try:
         decoded = decode_base64(stripped)
         if decoded["value"] and base64.b64encode(decoded["value"].encode()).decode().rstrip("=") == stripped.rstrip("="):
@@ -217,18 +230,21 @@ def identify(value: str) -> dict[str, Any]:
 
     if re.fullmatch(r"[0-9a-fA-F]+(?:\s+[0-9a-fA-F]+)*", stripped) and len(stripped.replace(" ", "")) % 2 == 0:
         try:
-            candidates.append({"type": "hex", "confidence": "high", "decoded": bytes.fromhex(stripped).decode()})
-        except UnicodeDecodeError:
+            candidates.append({"type": "hex", "confidence": "high", "decoded": bytes.fromhex(stripped.replace(" ", "")).decode()})
+        except (ValueError, UnicodeDecodeError):
             pass
 
     if re.fullmatch(r"(?:[01]{8}\s*)+", stripped):
-        candidates.append(
-            {
-                "type": "binary",
-                "confidence": "high",
-                "decoded": bytes(int(group, 2) for group in re.findall(r"[01]{8}", stripped)).decode(),
-            }
-        )
+        try:
+            candidates.append(
+                {
+                    "type": "binary",
+                    "confidence": "high",
+                    "decoded": bytes(int(group, 2) for group in re.findall(r"[01]{8}", stripped)).decode(),
+                }
+            )
+        except (ValueError, UnicodeDecodeError):
+            pass
 
     if re.fullmatch(r"[.\-/ ]+", stripped) and any(symbol in MORSE for symbol in stripped.split()):
         try:
