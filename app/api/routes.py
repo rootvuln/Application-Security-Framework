@@ -15,8 +15,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from app.core.config import MAX_FILE_SIZE, MAX_LOG_SIZE
 from app.core.risk import risk_level_for_findings
-from app.modules.cryptography.hash_tools import identify_hash, sha256_text
-from app.modules.cryptography.lab import (
+from app.modules.cryptography import (
     decode_base64,
     decode_brainfuck,
     decode_morse,
@@ -28,24 +27,26 @@ from app.modules.cryptography.lab import (
     generate_rsa_key_pair,
     hashes_for_text,
     identify,
+    identify_hash,
     rot,
     secure_token,
+    sha256_text,
     sign_rsa,
     verify_rsa,
 )
-from app.modules.forensics.analyzer import analyze_bytes as analyze_forensic_bytes
-from app.modules.log_analysis.analyzer import analyze_bytes as analyze_log_bytes
-from app.modules.malware_triage.analyzer import analyze_bytes as analyze_malware_bytes
-from app.modules.osint.analyzer import analyze_target
-from app.modules.web.dns import dns_records
-from app.modules.web.headers import inspect_headers
-from app.modules.web.scanners import (
+from app.modules.forensics import analyze_bytes as analyze_forensic_bytes
+from app.modules.log_analysis import analyze_bytes as analyze_log_bytes
+from app.modules.malware_triage import analyze_bytes as analyze_malware_bytes
+from app.modules.osint import analyze_target
+from app.modules.web import (
+    bounded_tcp_scan,
+    dns_records,
+    inspect_headers,
+    inspect_tls,
     run_nmap_profile,
     run_rustscan_profile,
     scanner_capabilities,
 )
-from app.modules.web.tcp import bounded_tcp_scan
-from app.modules.web.tls import inspect_tls
 from app.schemas.analysis import (
     AesDecryptRequest,
     AesEncryptRequest,

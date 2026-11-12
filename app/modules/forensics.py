@@ -1,3 +1,5 @@
+"""Forensics: static file inspection, hashing, entropy and hex preview."""
+
 from __future__ import annotations
 
 import hashlib
@@ -12,6 +14,8 @@ from typing import Any
 from app.core.config import MAX_FILE_SIZE as UPLOAD_LIMIT
 from app.schemas.analysis import Finding
 
+
+# ── analyzer.py ───────────────────────────────────────────────────────────────
 
 MAX_FILE_SIZE = UPLOAD_LIMIT  # 10 MB upload cap (see app.core.config)
 MAX_STRING_RESULTS = 100

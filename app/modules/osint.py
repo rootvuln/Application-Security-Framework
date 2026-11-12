@@ -1,3 +1,5 @@
+"""OSINT: passive reconnaissance of a domain or address."""
+
 from __future__ import annotations
 
 import ipaddress
@@ -5,6 +7,7 @@ import os
 import socket
 import ssl
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import Any
@@ -14,10 +17,148 @@ import dns.exception
 import dns.resolver
 import httpx
 
-from app.modules.web.validators import validate_hostname, validate_url
-from .parser import ParsedTarget, parse_target
-from .port_intelligence import inspect_port
+from app.modules.web import validate_hostname, validate_url
 
+
+# ── parser.py ─────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class ParsedTarget:
+    original: str
+    host: str
+    target_type: str
+    port: int | None
+
+
+def parse_target(value: str) -> ParsedTarget:
+    original = str(value or "").strip()
+    if not original or any(character.isspace() for character in original):
+        raise ValueError("Target must be a non-empty host or IP address without whitespace")
+    if "://" in original or "/" in original:
+        raise ValueError("URLs and paths are not valid OSINT targets")
+
+    host: str
+    port: int | None = None
+    if original.startswith("["):
+        closing = original.find("]")
+        if closing < 0:
+            raise ValueError("Bracketed IPv6 target is malformed")
+        host = original[1:closing]
+        suffix = original[closing + 1:]
+        if suffix:
+            if not suffix.startswith(":") or not suffix[1:]:
+                raise ValueError("IPv6 port syntax must be [address]:port")
+            port = _port(suffix[1:])
+    else:
+        try:
+            ipaddress.ip_address(original)
+            host = original
+        except ValueError:
+            if original.count(":") == 1:
+                candidate_host, candidate_port = original.rsplit(":", 1)
+                if not candidate_host or not candidate_port:
+                    raise ValueError("Host and port must both be provided")
+                host = candidate_host
+                port = _port(candidate_port)
+            elif original.count(":") > 1:
+                try:
+                    ipaddress.IPv6Address(original)
+                except ValueError as exc:
+                    raise ValueError("IPv6 targets with ports must use [address]:port syntax") from exc
+                host = original
+            else:
+                host = original
+
+    try:
+        parsed_ip = ipaddress.ip_address(host)
+    except ValueError:
+        target_type = "domain"
+    else:
+        target_type = "ipv6" if parsed_ip.version == 6 else "ipv4"
+    return ParsedTarget(original=original, host=host, target_type=target_type, port=port)
+
+
+def _port(value: str) -> int:
+    try:
+        port = int(value, 10)
+    except ValueError as exc:
+        raise ValueError("Port must be an integer from 1 to 65535") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError("Port must be an integer from 1 to 65535")
+    return port
+
+
+# ── port_intelligence.py ──────────────────────────────────────────────────────
+
+def _probe_banner(connection: socket.socket, host: str, port: int) -> tuple[str, str | None]:
+    connection.settimeout(1.0)
+    try:
+        data = connection.recv(256)
+    except TimeoutError:
+        data = b""
+    if data.startswith(b"SSH-"):
+        return "ssh", data.decode("ascii", "replace").strip()
+    if data.startswith(b"220"):
+        return "ftp", data.decode("ascii", "replace").strip()
+
+    request = f"HEAD / HTTP/1.0\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode()
+    connection.sendall(request)
+    data = connection.recv(512)
+    if data.startswith((b"HTTP/1.0", b"HTTP/1.1", b"HTTP/2")):
+        return "http", data.split(b"\r\n", 1)[0].decode("ascii", "replace")
+    return "unknown", None
+
+
+def inspect_port(host: str, addresses: list[str], port: int) -> dict[str, Any]:
+    started = time.monotonic()
+    result: dict[str, Any] = {
+        "port": port,
+        "status": "closed",
+        "connection_duration_ms": None,
+        "service": "unknown",
+        "service_identification_confidence": "none",
+        "protocol": None,
+        "banner": None,
+        "validated_address": None,
+    }
+    for address in addresses:
+        try:
+            context = ssl.create_default_context()
+            with socket.create_connection((address, port), timeout=3) as raw:
+                with context.wrap_socket(raw, server_hostname=host) as secure:
+                    result.update({
+                        "status": "open",
+                        "validated_address": address,
+                        "service": "https",
+                        "protocol": "https",
+                        "service_identification_confidence": "high",
+                        "tls_protocol": secure.version(),
+                    })
+                    break
+        except (OSError, ssl.SSLError, ValueError, TimeoutError):
+            pass
+        try:
+            with socket.create_connection((address, port), timeout=3) as connection:
+                result["status"] = "open"
+                result["validated_address"] = address
+                try:
+                    protocol, banner = _probe_banner(connection, host, port)
+                except (OSError, TimeoutError):
+                    protocol, banner = "unknown", None
+                result["service"] = protocol
+                result["protocol"] = protocol if protocol != "unknown" else None
+                result["banner"] = banner
+                result["service_identification_confidence"] = (
+                    "high" if protocol != "unknown" else "low"
+                )
+                break
+        except (OSError, TimeoutError):
+            continue
+    result["connection_duration_ms"] = round((time.monotonic() - started) * 1000)
+    return result
+
+
+# ── analyzer.py ───────────────────────────────────────────────────────────────
 
 RECORD_TYPES = ("A", "AAAA", "MX", "NS", "TXT", "CNAME")
 MAX_WEBSITE_BYTES = 1_000_000

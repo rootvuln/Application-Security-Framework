@@ -86,13 +86,17 @@ app/
 │   └── session_store.py     bounded in-memory session result store
 ├── schemas/analysis.py      shared Pydantic request, finding and response models
 └── modules/                 pure analysis logic, no FastAPI imports
-    ├── cryptography/
-    ├── forensics/
-    ├── log_analysis/        incl. pcap_analysis.py
-    ├── malware_triage/      incl. sections.py, rules.py, strings.py, entropy.py
-    ├── osint/
-    └── web/
+    ├── cryptography.py      hashing, base64, ciphers, AES-GCM, RSA, tokens
+    ├── forensics.py         file triage, hashing, entropy, hex preview
+    ├── log_analysis.py      text logs plus pcap/pcapng packet captures
+    ├── malware_triage.py    ELF/PE parsing, sections, rules, string extraction
+    ├── osint.py             passive recon, DNS records, port intelligence
+    └── web.py               DNS, headers, TLS, TCP ports, scanner wrappers
 ```
+
+Every module is a single file. Inside each one the original sub-modules are kept
+as clearly marked sections (`# ── sections.py ──`, `# ── rules.py ──`, …) so the
+layout of the code is still readable without a folder per capability.
 
 `app/main.py` creates the FastAPI application and provides CORS, rate limiting,
 session cookies, audit logging, and health checks.
