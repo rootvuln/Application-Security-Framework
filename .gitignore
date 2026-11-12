@@ -63,7 +63,16 @@ dist/
 *.egg-info/
 *.egg
 
+# Frontend (Node) — entire folder is local-only
+frontend/
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
 # Temporary files & uploads
 tmp/
 temp/
 *.tmp
+

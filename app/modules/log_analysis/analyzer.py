@@ -7,9 +7,10 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from app.modules.forensics.analyzer import analyze_bytes as analyze_forensic_bytes
+from app.core.config import MAX_LOG_SIZE as LOG_UPLOAD_LIMIT
+from app.modules.log_analysis.pcap_analysis import analyze_capture
 
-MAX_LOG_SIZE = 10 * 1024 * 1024
+MAX_LOG_SIZE = LOG_UPLOAD_LIMIT  # 10 MB upload cap (see app.core.config)
 MAX_LOG_LINES = 100_000
 BRUTE_FORCE_WINDOW_SECONDS = 5 * 60
 SCAN_MIN_DISTINCT_PORTS = 3
@@ -289,22 +290,14 @@ def _finding(
 
 def _pcap_analysis(
     data: bytes, filename: str
-) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    forensic_details, forensic_findings = analyze_forensic_bytes(
-        data,
-        filename,
-        "application/vnd.tcpdump.pcap",
-    )
-    return {
-        "filename": filename,
-        "source_format": forensic_details["signature"]["description"],
-        "capture": forensic_details.get("capture"),
-        "hashes": forensic_details["hashes"],
-        "warnings": [
-            "Packet captures are analyzed as network data, not text logs.",
-            "Static packet summaries do not prove malicious activity.",
-        ],
-    }, [finding.model_dump() for finding in forensic_findings]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Decode a capture into flows, findings and log-analysis view models.
+
+    Previously this delegated to the forensics analyser, which only identifies
+    the file signature and hashes it - a .pcap upload therefore produced a
+    single "Packet capture detected" finding and no network detail.
+    """
+    return analyze_capture(data, filename)
 
 
 def analyze_bytes(data: bytes, filename: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:

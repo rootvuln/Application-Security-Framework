@@ -13,7 +13,9 @@ class RotDecodeRequest(BaseModel):
 
 class PortScanRequest(BaseModel):
     target: str = Field(min_length=1, max_length=253)
-    ports: list[int] = Field(default_factory=lambda: [22, 80, 443])
+    # Numbers and ranges, e.g. [80, "443", "1000-1010", "1:1024"].
+    # Expansion and validation happen in app.modules.web.tcp.parse_ports.
+    ports: list[int | str] = Field(default_factory=lambda: [22, 80, 443])
 
 
 class AesEncryptRequest(BaseModel):

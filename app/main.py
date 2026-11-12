@@ -13,42 +13,49 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
-from app.api.routes import router
+from app.api import router
+from app.core.config import (
+    ALLOWED_ORIGINS,
+    RATE_LIMIT_EXEMPT_PATHS,
+    RATE_LIMIT_REQUESTS,
+    RATE_LIMIT_WINDOW_SECONDS,
+    SERVICE_NAME,
+    SERVICE_VERSION,
+    SESSION_COOKIE,
+)
 
 app = FastAPI(
-    title="CyberSuite API",
+    title=SERVICE_NAME,
     description="Cybersecurity analysis backend",
-    version="0.1.0",
+    version=SERVICE_VERSION,
 )
 audit_logger = logging.getLogger("cybersuite.audit")
 
 app.include_router(router)
 
 _request_times: defaultdict[str, deque[float]] = defaultdict(deque)
-_RATE_LIMIT = 60
-_RATE_WINDOW_SECONDS = 60.0
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.method == "OPTIONS" or request.url.path in {"/api/health", "/docs", "/openapi.json", "/redoc"}:
+        if request.method == "OPTIONS" or request.url.path in RATE_LIMIT_EXEMPT_PATHS:
             return await call_next(request)
         client = request.client.host if request.client else "unknown"
         now = monotonic()
         timestamps = _request_times[client]
-        while timestamps and now - timestamps[0] >= _RATE_WINDOW_SECONDS:
+        while timestamps and now - timestamps[0] >= RATE_LIMIT_WINDOW_SECONDS:
             timestamps.popleft()
         if not timestamps and client in _request_times:
             _request_times.pop(client, None)
             timestamps = _request_times[client]
-        if len(timestamps) >= _RATE_LIMIT:
+        if len(timestamps) >= RATE_LIMIT_REQUESTS:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded; try again later"},
                 headers={"Retry-After": "60"},
             )
         timestamps.append(now)
-        session_id = request.cookies.get("cybersuite_session")
+        session_id = request.cookies.get(SESSION_COOKIE)
         if not session_id:
             session_id = secrets.token_urlsafe(24)
         request.state.session_id = session_id
@@ -60,9 +67,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             response.status_code,
             client,
         )
-        if "cybersuite_session" not in request.cookies:
+        if SESSION_COOKIE not in request.cookies:
             response.set_cookie(
-                "cybersuite_session",
+                SESSION_COOKIE,
                 session_id,
                 httponly=True,
                 samesite="lax",
@@ -76,12 +83,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=list(ALLOWED_ORIGINS),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,7 +94,7 @@ def health_check():
     return {
         "success": True,
         "status": "running",
-        "service": "CyberSuite API",
+        "service": SERVICE_NAME,
     }
 
 

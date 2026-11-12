@@ -9,10 +9,11 @@ from collections import Counter
 from pathlib import PurePath
 from typing import Any
 
+from app.core.config import MAX_FILE_SIZE as UPLOAD_LIMIT
 from app.schemas.analysis import Finding
 
 
-MAX_FILE_SIZE = 10 * 1024 * 1024
+MAX_FILE_SIZE = UPLOAD_LIMIT  # 10 MB upload cap (see app.core.config)
 MAX_STRING_RESULTS = 100
 MAX_STRING_LENGTH = 4096
 MAX_CAPTURE_PACKETS = 100_000
@@ -62,20 +63,30 @@ def _entropy(data: bytes) -> float:
     )
 
 
-def _strings(data: bytes) -> list[str]:
+def _strings(
+    data: bytes,
+    min_length: int = 4,
+    limit: int = MAX_STRING_RESULTS,
+    max_length: int = MAX_STRING_LENGTH,
+) -> list[str]:
+    """Extract bounded printable ASCII runs.
+
+    Callers that need a fuller listing (malware triage) pass a larger ``limit``;
+    forensic analysis keeps the small default so the response stays compact.
+    """
     results: list[str] = []
     current = bytearray()
     for byte in data:
         if 32 <= byte <= 126:
             current.append(byte)
             continue
-        if len(current) >= 4:
-            results.append(current[:MAX_STRING_LENGTH].decode("ascii"))
+        if len(current) >= min_length:
+            results.append(current[:max_length].decode("ascii"))
         current.clear()
-        if len(results) >= MAX_STRING_RESULTS:
+        if len(results) >= limit:
             break
-    if len(current) >= 4 and len(results) < MAX_STRING_RESULTS:
-        results.append(current[:MAX_STRING_LENGTH].decode("ascii"))
+    if len(current) >= min_length and len(results) < limit:
+        results.append(current[:max_length].decode("ascii"))
     return results
 
 

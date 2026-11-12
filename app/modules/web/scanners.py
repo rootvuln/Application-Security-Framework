@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from app.modules.web.tcp import MAX_SCAN_PORTS
+from app.modules.web.tcp import MAX_SCAN_PORTS, parse_ports
 from app.modules.web.validators import validate_hostname
 
 
@@ -23,13 +23,9 @@ def scanner_capabilities() -> dict[str, Any]:
     }
 
 
-def _validate_ports(ports: list[int]) -> list[int]:
-    unique_ports = sorted(set(ports))
-    if not unique_ports or len(unique_ports) > MAX_SCAN_PORTS:
-        raise ValueError(f"Provide between 1 and {MAX_SCAN_PORTS} ports")
-    if any(port < 1 or port > 65535 for port in unique_ports):
-        raise ValueError("Ports must be between 1 and 65535")
-    return unique_ports
+def _validate_ports(ports: Any) -> list[int]:
+    # Shared with the TCP checker so ranges ("1000-1010") work here too.
+    return parse_ports(ports)
 
 
 def _run(command: list[str], tool: str) -> dict[str, Any]:
