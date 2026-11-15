@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import os
 from collections import defaultdict, deque
 import secrets
 import logging
@@ -103,6 +104,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
         host="127.0.0.1",
-        port=8000,
+        port=int(os.environ.get("PORT", 10000)),
         reload=True,
     )
