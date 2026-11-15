@@ -32,5 +32,6 @@ ALLOWED_ORIGINS = (
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "https://application-security-framework.vercel.app",
+    "https://application-security-framework-mlaypewo3-rootvuln01-5356.vercel.app",
 )
 
